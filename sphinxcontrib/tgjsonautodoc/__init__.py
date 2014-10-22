@@ -62,6 +62,27 @@ class TGJSONAutodoc(Directive):
             return True
         return False
 
+    def _get_path_and_method(self, value, controller):
+        found = False
+        if isinstance(controller, RestController):
+            path = controller.mount_point
+            http_method = value.__name__.upper()
+            for normalized_method in ('GET', 'POST', 'PUT', 'DELETE'):
+                if http_method.startswith(normalized_method):
+                    http_method = normalized_method
+                    found = True
+                    break
+        if not found:
+            path = controller.mount_point + '/' + (value.__name__ if value.__name__ != "index" else "")
+            http_method = "GET"
+            if value.__doc__ and ":method:" in value.__doc__:
+                _, method = value.__doc__.split(':method:', 1)
+                for normalized_method in ('GET', 'POST', 'PUT', 'DELETE'):
+                    if method.strip().startswith(normalized_method):
+                        http_method = normalized_method
+                        break
+        return path, http_method
+
     def _gather_controller_json_methods(self, root_controller):
         json_methods = {}
         controllers = [root_controller]
@@ -77,16 +98,7 @@ class TGJSONAutodoc(Directive):
                 elif hasattr(value, 'decoration') and value.decoration.exposed:
                     registered_engines = map(operator.itemgetter(0), value.decoration.engines.values())
                     if 'json' in registered_engines:
-                        if isinstance(ci_instance, RestController):
-                            path = ci_instance.mount_point
-                            http_method = value.__name__.upper()
-                            for normalized_method in ('GET', 'POST', 'PUT', 'DELETE'):
-                                if http_method.startswith(normalized_method):
-                                    http_method = normalized_method
-                                    break
-                        else:
-                            path = ci_instance.mount_point + '/' + value.__name__
-                            http_method = 'GET'
+                        path, http_method = self._get_path_and_method(value, ci_instance)
 
                         should_skip = False
                         for skip_url in self.options.get('skip-urls', '').split(','):
