@@ -46,7 +46,7 @@ class TGJSONAutodoc(Directive):
     required_arguments = 0
     optional_arguments = 0
     has_content = False
-    option_spec = {'skip-urls': directives.unchanged}
+    option_spec = {'skip-urls': directives.unchanged, 'sort-by-path': directives.unchanged}
 
     def _retrieve_root(self):
         env = self.state.document.settings.env
@@ -130,6 +130,9 @@ class TGJSONAutodoc(Directive):
                                                             'argd': argd, 'http_method': http_method,
                                                             'doc':value.__doc__, 'path':path,
                                                             'validation':value.decoration.validation}
+        if self.options.get('sort-by-path', 'False') in ('True', 'true'):
+            import collections
+            json_methods = collections.OrderedDict(sorted(json_methods.items()))
         return json_methods
 
     def add_line(self, line):
