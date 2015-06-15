@@ -1,2 +1,8 @@
 *.swp
 *.pyc
+*.pyo
+
+# ignore files from develop mode installation
+/build/
+/dist/
+/sphinxcontrib_jsoncall.egg-info/

@@ -1,5 +1,5 @@
 import docutils, json, os
-from urlparse import urljoin
+from urlparse import urljoin, urlsplit
 from docutils import nodes
 from docutils.parsers.rst import directives
 from docutils.parsers.rst import Directive
@@ -18,9 +18,16 @@ function indented_fill_%(callid)s_result(data) {
 function perform_%(callid)s_call() {
     var params = {};
     jQuery("#jsoncall_%(callid)s_params input").each(function(i, e) {
-       e = jQuery(e);
-       params[e.attr("name")] = e.val();
+        e = jQuery(e);
+        params[e.attr("name")] = e.val();
     });
+    jQuery("#jsoncall_%(callid)s_params select").each(function(i, e) {
+        e = jQuery(e);
+        value = $('#'+e.attr("id")+' option:selected').val();
+        params[e.attr("name")] = value;
+    });
+
+
     jQuery.ajax({
                 "url":"%(url)s",
                 "type": "%(http_method)s",
@@ -53,17 +60,27 @@ class jsoncall(nodes.Element):
 def visit_jsoncall_html(self, node):
     self.body.append(JSONCALL_JS % dict(callid=node.callid, url=node.url, http_method=node.http_method))
  
+def get_real_key(key):
+    if key.startswith("option:"):
+        return key[len("option:"):]
+    return key
+
 def depart_jsoncall_html(self, node):
     self.body.append('<table class="jsoncall_testform" id="jsoncall_%s_params">' % node.callid)
     for key, value in node.params.items():
-        value = escape(value)
         self.body.append('<tr>')
-        self.body.append('<td>%s</td>' % key)
-        self.body.append('<td><input style="min-width:200px;padding:5px;" type="text" name="%s" value="%s"/></td>' % (key, value))
+        real_key = get_real_key(key)
+        self.body.append('<td>%s </td>' % real_key)
+        if key.startswith("option:"):
+            options = "".join(map(lambda (desc, value): "<option value='%s'>%s</option>" % (value, escape(desc)), value))
+            self.body.append('<td><select name="%s" id="opt_%s">%s</select></td>' % (real_key, real_key, options))
+        else:
+            value = escape(value)
+            self.body.append('<td><input style="min-width:200px;padding:5px;" type="text" name="%s" value="%s"/></td>' % (key, value))
         self.body.append('</tr>')
     self.body.append('</table>')
 
-    self.body.append('<div class="jsoncall_button" onclick="perform_%s_call()">Test Call</div>' % node.callid)   
+    self.body.append('<div class="jsoncall_button" id="jsoncall_%s_button" onclick="perform_%s_call()">Test Call</div>' % (node.callid, node.callid))
     self.body.append('<pre class="jsoncall_result" id="jsoncall_%s_result">%s</pre>' % (node.callid, node.static_response))
     self.body.append("""
 <script>
@@ -75,20 +92,37 @@ class JSONCall(Directive):
     required_arguments = 1
     optional_arguments = 0
     has_content = True
-    option_spec = {'method': directives.unchanged}
+    option_spec = {
+                    'method': directives.unchanged,
+                    'port': directives.nonnegative_int
+                }
 
     def run(self):
         env = self.state.document.settings.env
-        
+
         http_method = self.options.get('method', 'GET')
-        baseurl = env.config.jsoncall_baseurl
+        http_port = self.options.get('port', '')
+        base_url = env.config.jsoncall_baseurl
         url = self.arguments[0]
-        apiurl = urljoin( env.config.jsoncall_baseurl, url)
+        if http_port:
+            split_res = urlsplit(base_url)
+            if ':' in split_res.netloc:
+                netloc = ":".join(split_res.netloc.split(':')[:-1]) # just strip port if it already exists
+            else:
+                netloc = split_res.netloc + ":" + str(http_port)
+            base_url = split_res._replace(netloc=netloc).geturl()
+            #raise RuntimeError(base_url)
+        apiurl = urljoin(base_url, url)
+
         iter_content = chain(self.content)
         content = '\n'.join(list(takewhile(lambda x: x.strip(), iter_content)))
         static_response = '\n'.join(list(iter_content))
         callid = env.new_serialno('jsoncall')
-        return [jsoncall(url=apiurl, http_method=http_method, params=json.loads(content), 
+        try:
+            params = json.loads(content)
+        except ValueError, v:
+            raise ValueError("Invalid json: %s\nError: %s" % (content, v))
+        return [jsoncall(url=apiurl, http_method=http_method, params=params,
                          callid=callid, static_response=static_response)]
 
 def on_init(app):
