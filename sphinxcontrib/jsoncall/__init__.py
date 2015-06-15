@@ -8,6 +8,12 @@ from ._escaping import escape
 
 JSONCALL_JS = """
 <script>
+
+function getPrintObject(object)
+{
+    return JSON.stringify(object);
+}
+
 function indented_fill_%(callid)s_result(data) {
     if (typeof data !== "string")
         data = JSON.stringify(data, undefined, 2);
@@ -15,18 +21,47 @@ function indented_fill_%(callid)s_result(data) {
     dest.html(jsoncall_syntax_highlight(data));
 }
 
-function perform_%(callid)s_call() {
+function toogle(key) {
+    obj = jQuery('#' + key);
+    if (obj.prop('disabled')) {
+        obj.removeAttr('disabled');
+    } else {
+        obj.attr('disabled', 'disabled');
+    }
+}
+
+function cast_number(val) {
+    intval = parseInt(val, 10);
+    if (val == intval) return intval;
+    return val;
+}
+
+function get_%(callid)s_params() {
     var params = {};
     jQuery("#jsoncall_%(callid)s_params input").each(function(i, e) {
         e = jQuery(e);
-        params[e.attr("name")] = e.val();
+        if (!e.prop('disabled')) {
+            params[e.attr("name")] = e.val();
+        }
     });
     jQuery("#jsoncall_%(callid)s_params select").each(function(i, e) {
         e = jQuery(e);
         value = $('#'+e.attr("id")+' option:selected').val();
-        params[e.attr("name")] = value;
+        if (!e.prop('disabled')) {
+            params[e.attr("name")] = value;
+        }
     });
+    return params;
+}
 
+function show_%(callid)s_call() {
+    params = get_%(callid)s_params();
+    var dest = jQuery("#jsoncall_%(callid)s_result");
+    dest.html(jsoncall_syntax_highlight(getPrintObject(params)));
+}
+
+function perform_%(callid)s_call() {
+    params = get_%(callid)s_params();
 
     jQuery.ajax({
                 "url":"%(url)s",
@@ -67,19 +102,36 @@ def get_real_key(key):
 
 def depart_jsoncall_html(self, node):
     self.body.append('<table class="jsoncall_testform" id="jsoncall_%s_params">' % node.callid)
-    for key, value in node.params.items():
+    if isinstance(node.params, dict):
+        items = node.params.items()
+    else:
+        items = node.params
+
+    for next_item in items:
+        optional = False
+        key, value = next_item[:2]
+        extras = ''
+        disabled = ''
         self.body.append('<tr>')
         real_key = get_real_key(key)
-        self.body.append('<td>%s </td>' % real_key)
+        field_id = "f_%s_%s" % (real_key, node.callid)
+        if len(next_item) >= 3:
+            if "optional" in next_item[2]:
+                extras += 'onclick="toogle(\'%s\')" ' % field_id
+            if "disabled" in next_item[2]:
+                disabled = 'disabled="disabled" '
+        self.body.append('<td %s> %s </td>' % (extras, real_key))
         if key.startswith("option:"):
             options = "".join(map(lambda (desc, value): "<option value='%s'>%s</option>" % (value, escape(desc)), value))
-            self.body.append('<td><select name="%s" id="opt_%s">%s</select></td>' % (real_key, real_key, options))
+            self.body.append('<td><select name="%s" id="%s" %s>%s</select></td>' % (real_key, field_id, disabled, options))
         else:
             value = escape(value)
-            self.body.append('<td><input style="min-width:200px;padding:5px;" type="text" name="%s" value="%s"/></td>' % (key, value))
+            self.body.append('<td><input style="min-width:200px;padding:5px;" type="text" name="%s" id="%s" %s value="%s"/></td>' %
+                    (real_key, field_id, disabled, value))
         self.body.append('</tr>')
     self.body.append('</table>')
 
+    self.body.append('<div class="jsoncall_button" onclick="show_%s_call()">Show Request</div> &nbsp;' % node.callid)
     self.body.append('<div class="jsoncall_button" id="jsoncall_%s_button" onclick="perform_%s_call()">Test Call</div>' % (node.callid, node.callid))
     self.body.append('<pre class="jsoncall_result" id="jsoncall_%s_result">%s</pre>' % (node.callid, node.static_response))
     self.body.append("""
