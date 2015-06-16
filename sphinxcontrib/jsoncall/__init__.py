@@ -16,17 +16,29 @@ function indented_fill_%(callid)s_result(data) {
     dest.html(jsoncall_syntax_highlight(data));
 }
 
+function get_%(callid)s_url(params) {
+    var url = "%(url)s";
+    if ('$_url_extension_$' in params) {
+        url += params['$_url_extension_$'];
+        delete params['$_url_extension_$'];
+    }
+    return url;
+}
+
 function show_%(callid)s_call() {
     params = get_params(%(callid)s);
+    url = get_%(callid)s_url(params);
     var dest = jQuery("#jsoncall_%(callid)s_result");
-    dest.html(jsoncall_syntax_highlight(obj_to_json(params)));
+    dest.html("%(http_method)s " + url + "<br />" +
+        jsoncall_syntax_highlight(obj_to_json(params)));
 }
 
 function perform_%(callid)s_call() {
     params = get_params(%(callid)s);
+    url = get_%(callid)s_url(params);
 
     jQuery.ajax({
-                "url":"%(url)s",
+                "url":url,
                 "method": "%(http_method)s",
                 "data": params,
                 "dataType":"json",
