@@ -56,7 +56,7 @@ div.document .descname {
 }
 
 div.document .descclassname {
-	display: None
+	visibility: hidden;
 }
 
 
