@@ -18,9 +18,9 @@ function indented_fill_%(callid)s_result(data) {
 
 function get_%(callid)s_url(params) {
     var url = "%(url)s";
-    if ('$_url_extension_$' in params) {
-        url += params['$_url_extension_$'];
-        delete params['$_url_extension_$'];
+    if ('__url_extension__' in params) {
+        url += params['__url_extension__'];
+        delete params['__url_extension__'];
     }
     return url;
 }
