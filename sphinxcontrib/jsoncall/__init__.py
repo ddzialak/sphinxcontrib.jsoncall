@@ -9,11 +9,6 @@ from ._escaping import escape
 JSONCALL_JS = """
 <script>
 
-function obj_to_json(object)
-{
-    return JSON.stringify(object);
-}
-
 function indented_fill_%(callid)s_result(data) {
     if (typeof data !== "string")
         data = JSON.stringify(data, undefined, 2);
@@ -21,53 +16,18 @@ function indented_fill_%(callid)s_result(data) {
     dest.html(jsoncall_syntax_highlight(data));
 }
 
-function toogle(key) {
-    obj = jQuery('#' + key);
-    if (obj.prop('disabled')) {
-        obj.removeAttr('disabled');
-    } else {
-        obj.attr('disabled', 'disabled');
-    }
-}
-
-function cast_value(val) {
-    try {
-        return JSON.parse(val);
-    } catch (err) {
-    }
-    return val;
-}
-
-function get_%(callid)s_params() {
-    var params = {};
-    jQuery("#jsoncall_%(callid)s_params input").each(function(i, e) {
-        e = jQuery(e);
-        if (!e.prop('disabled')) {
-            params[e.attr("name")] = cast_value(e.val());
-        }
-    });
-    jQuery("#jsoncall_%(callid)s_params select").each(function(i, e) {
-        e = jQuery(e);
-        value = $('#'+e.attr("id")+' option:selected').val();
-        if (!e.prop('disabled')) {
-            params[e.attr("name")] = cast_value(value);
-        }
-    });
-    return params;
-}
-
 function show_%(callid)s_call() {
-    params = get_%(callid)s_params();
+    params = get_params(%(callid)s);
     var dest = jQuery("#jsoncall_%(callid)s_result");
     dest.html(jsoncall_syntax_highlight(obj_to_json(params)));
 }
 
 function perform_%(callid)s_call() {
-    params = get_%(callid)s_params();
+    params = get_params(%(callid)s);
 
     jQuery.ajax({
                 "url":"%(url)s",
-                "type": "%(http_method)s",
+                "method": "%(http_method)s",
                 "data": params,
                 "dataType":"json",
                 'success':function(data, textStatus, jqXHR) {
