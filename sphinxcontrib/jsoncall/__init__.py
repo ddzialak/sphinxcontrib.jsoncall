@@ -9,7 +9,7 @@ from ._escaping import escape
 JSONCALL_JS = """
 <script>
 
-function getPrintObject(object)
+function obj_to_json(object)
 {
     return JSON.stringify(object);
 }
@@ -30,9 +30,11 @@ function toogle(key) {
     }
 }
 
-function cast_number(val) {
-    intval = parseInt(val, 10);
-    if (val == intval) return intval;
+function cast_value(val) {
+    try {
+        return JSON.parse(val);
+    } catch (err) {
+    }
     return val;
 }
 
@@ -41,14 +43,14 @@ function get_%(callid)s_params() {
     jQuery("#jsoncall_%(callid)s_params input").each(function(i, e) {
         e = jQuery(e);
         if (!e.prop('disabled')) {
-            params[e.attr("name")] = e.val();
+            params[e.attr("name")] = cast_value(e.val());
         }
     });
     jQuery("#jsoncall_%(callid)s_params select").each(function(i, e) {
         e = jQuery(e);
         value = $('#'+e.attr("id")+' option:selected').val();
         if (!e.prop('disabled')) {
-            params[e.attr("name")] = value;
+            params[e.attr("name")] = cast_value(value);
         }
     });
     return params;
@@ -57,7 +59,7 @@ function get_%(callid)s_params() {
 function show_%(callid)s_call() {
     params = get_%(callid)s_params();
     var dest = jQuery("#jsoncall_%(callid)s_result");
-    dest.html(jsoncall_syntax_highlight(getPrintObject(params)));
+    dest.html(jsoncall_syntax_highlight(obj_to_json(params)));
 }
 
 function perform_%(callid)s_call() {
@@ -73,10 +75,14 @@ function perform_%(callid)s_call() {
                 },
                 'error':function(jqXHR, textStatus, errorThrown) {
                         var dest = jQuery("#jsoncall_%(callid)s_result");
-                        if (textStatus === "error")
-                            dest.text(jqXHR.statusText);
-                        else
-                            dest.text(textStatus);
+                        var text = "Status: " + textStatus + "<br />\\n";
+                        try {
+                            text += jsoncall_syntax_highlight(JSON.parse(jqXHR.responseJSON)) + "<br />\\n"; 
+                        } catch(err) {
+                            text += "data: " + jqXHR.responseText + "<br />\\n";
+                        }
+                        if (errorThrown != jqXHR.statusText) { text += "thrown: " + obj_to_json(errorThrown); }
+                        dest.html(text);
                 }
     });
 }
@@ -115,14 +121,23 @@ def depart_jsoncall_html(self, node):
         self.body.append('<tr>')
         real_key = get_real_key(key)
         field_id = "f_%s_%s" % (real_key, node.callid)
+        show_key = real_key
         if len(next_item) >= 3:
             if "optional" in next_item[2]:
                 extras += 'onclick="toogle(\'%s\')" ' % field_id
+                show_key = "[%s]" % real_key
             if "disabled" in next_item[2]:
                 disabled = 'disabled="disabled" '
-        self.body.append('<td %s> %s </td>' % (extras, real_key))
+        self.body.append('<td %s> %s </td>' % (extras, show_key))
         if key.startswith("option:"):
-            options = "".join(map(lambda (desc, value): "<option value='%s'>%s</option>" % (value, escape(desc)), value))
+            def make_option(entry):
+                if isinstance(entry, list):
+                    assert len(entry) == 2, "List value in option parameter must have exactly 2 elements: description and value (not: %s)" % entry
+                    desc, value = entry
+                else:
+                    desc = value = entry
+                return "<option value='%s'>%s</option>" % (value, escape(desc))
+            options = "".join(map(make_option, value))
             self.body.append('<td><select name="%s" id="%s" %s>%s</select></td>' % (real_key, field_id, disabled, options))
         else:
             value = escape(value)
