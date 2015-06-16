@@ -49,3 +49,15 @@
 .jsoncall_result .jsoncall_sxh_boolean { color: blue; }
 .jsoncall_result .jsoncall_sxh_null { color: magenta; }
 .jsoncall_result .jsoncall_sxh_key { color: darkblue;  }
+
+/* THIS IS SPECIAL CASE FOR OUR NEEDs...  probably YOU DONT WANT STYLES BELOW */
+div.document .descname {
+	font-size: 2em;
+}
+
+div.document .descclassname {
+	display: None
+}
+
+
+
